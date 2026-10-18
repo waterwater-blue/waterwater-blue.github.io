@@ -1,0 +1,443 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？ | waterwater-blue</title><meta name="author" content="waterwater-blue"><meta name="copyright" content="waterwater-blue"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="fff7fa"><meta name="description" content="抓包是网络分析的入门功夫。装好 Wireshark，双击网卡，点击”开始”，看着屏幕上滚动的数据包，很多人会有一种”我能看见互联网了”的错觉。 但真正有意思的问题不是”我看到了什么”，而是三个追问：  QQ 到底用 UDP 还是 TCP？ 它的通信是加密还是明文？ 如果是明文，能不能把传输的文件原样捞出来？  网上关于第一个问题的答案两极分化。有人信誓旦旦”QQ 用 UDP 8000 端口”，也有">
+<meta property="og:type" content="article">
+<meta property="og:title" content="用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？">
+<meta property="og:url" content="https://waterwater-blue.github.io/2026/10/18/qq-wireshark-analysis/index.html">
+<meta property="og:site_name" content="waterwater-blue">
+<meta property="og:description" content="抓包是网络分析的入门功夫。装好 Wireshark，双击网卡，点击”开始”，看着屏幕上滚动的数据包，很多人会有一种”我能看见互联网了”的错觉。 但真正有意思的问题不是”我看到了什么”，而是三个追问：  QQ 到底用 UDP 还是 TCP？ 它的通信是加密还是明文？ 如果是明文，能不能把传输的文件原样捞出来？  网上关于第一个问题的答案两极分化。有人信誓旦旦”QQ 用 UDP 8000 端口”，也有">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://waterwater-blue.github.io/img/butterfly-icon.png">
+<meta property="article:published_time" content="2026-10-18T11:40:00.000Z">
+<meta property="article:modified_time" content="2026-10-18T11:41:41.673Z">
+<meta property="article:author" content="waterwater-blue">
+<meta property="article:tag" content="Wireshark">
+<meta property="article:tag" content="抓包分析">
+<meta property="article:tag" content="网络安全">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://waterwater-blue.github.io/img/butterfly-icon.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？",
+  "url": "https://waterwater-blue.github.io/2026/10/18/qq-wireshark-analysis/",
+  "image": "https://waterwater-blue.github.io/img/butterfly-icon.png",
+  "datePublished": "2026-10-18T11:40:00.000Z",
+  "dateModified": "2026-10-18T11:41:41.673Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "waterwater-blue",
+      "url": "https://waterwater-blue.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.ico"><link rel="canonical" href="https://waterwater-blue.github.io/2026/10/18/qq-wireshark-analysis/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', 'fff7fa')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 8.1.2"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">waterwater-blue</span></a><a class="nav-page-title" href="/"><span class="site-name">用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-18T11:40:00.000Z" title="发表于 2026-10-18 19:40:00">2026-10-18</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-18T11:41:41.673Z" title="更新于 2026-10-18 19:41:41">2026-10-18</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%88%86%E6%9E%90/">网络分析</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><p>抓包是网络分析的入门功夫。装好 Wireshark，双击网卡，点击”开始”，看着屏幕上滚动的数据包，很多人会有一种”我能看见互联网了”的错觉。</p>
+<p>但真正有意思的问题不是”我看到了什么”，而是三个追问：</p>
+<ol>
+<li>QQ 到底用 UDP 还是 TCP？</li>
+<li>它的通信是加密还是明文？</li>
+<li>如果是明文，能不能把传输的文件原样捞出来？</li>
+</ol>
+<p>网上关于第一个问题的答案两极分化。有人信誓旦旦”QQ 用 UDP 8000 端口”，也有人说是 TCP。到底谁对？</p>
+<p>我用自己的电脑和手机做了两组抓包，尝试回答这三个问题。结论是：<strong>第一个问题的流传版本已经过时，第二个答案是”加密”，第三个问题的答案取决于一个容易被忽略的前提。</strong></p>
+<blockquote>
+<p>隐私声明：本文所有抓包均基于本人自有账号、本人设备，在本人局域网内完成。文中 IP、域名等可能定位到个人网络的信息已做脱敏处理，未包含任何聊天内容、账号信息或第三方通信数据。</p>
+</blockquote>
+<h2 id="一、实验环境与方法"><a href="#一、实验环境与方法" class="headerlink" title="一、实验环境与方法"></a>一、实验环境与方法</h2><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>配置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>操作系统</td>
+<td>Windows 11</td>
+</tr>
+<tr>
+<td>抓包工具</td>
+<td>Wireshark 4.x</td>
+</tr>
+<tr>
+<td>PC 端 QQ</td>
+<td>NTQQ 9.9.x</td>
+</tr>
+<tr>
+<td>手机端 QQ</td>
+<td>8.9.x</td>
+</tr>
+<tr>
+<td>网络环境</td>
+<td>校园网（WLAN）</td>
+</tr>
+</tbody></table>
+<p>抓包方法本身没什么讲究：双击首页的 WLAN 网卡开始抓包，在抓包过程中依次执行发文字消息、发图片、传小文件等动作，然后停止并保存为 pcapng 文件。关键动作要在抓包窗口打开时进行，否则对应的流量不会被记录。</p>
+<p>一个重要的经验：<strong>抓包前要先定位 QQ 连接的目标 IP</strong>，否则数据包列表里混着浏览器、系统更新、游戏等各类流量，难以分辨。可以用 PowerShell 查出 QQ 进程的实际连接：</p>
+<figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">Get-NetTCPConnection</span> <span class="literal">-State</span> Established |</span><br><span class="line">  <span class="built_in">Where-Object</span> &#123; (<span class="built_in">Get-Process</span> <span class="literal">-Id</span> <span class="variable">$_</span>.OwningProcess).ProcessName <span class="operator">-match</span> <span class="string">&#x27;QQ&#x27;</span> &#125; |</span><br><span class="line">  <span class="built_in">Select-Object</span> RemoteAddress, RemotePort, OwningProcess</span><br></pre></td></tr></table></figure>
+
+<p>输出的结果指向腾讯自有网段（脱敏记作 A.B.C.D，端口 443），这些就是后续过滤的依据。</p>
+<h2 id="二、问题一：UDP-还是-TCP？"><a href="#二、问题一：UDP-还是-TCP？" class="headerlink" title="二、问题一：UDP 还是 TCP？"></a>二、问题一：UDP 还是 TCP？</h2><p><strong>结论：TCP。</strong></p>
+<p>用 <code>tcp.port == 443</code> 作为显示过滤器，Wireshark 筛选出 22 个相关数据包。</p>
+<p><img src="/img/qq-wireshark/01-tcp443.png" alt="TCP&#x2F;443 过滤结果"></p>
+<p>从数据包列表的 Protocol 列可以看到，<strong>这 22 个包全部是 TCP</strong>，目标端口一致为 443（即 HTTPS 的标准端口）。</p>
+<p>为了排除”可能存在其他传输方式”的可能，我又用 <code>udp.port == 8000</code> 这个老教程中常见的过滤器做了对照。结果是：<strong>没有任何数据包被匹配上。</strong></p>
+<p>这一点值得特别说明。搜索”QQ 抓包”会看到大量教程声称 QQ 使用 UDP 8000 端口，并给出 <code>0x02</code> 开头、<code>0x03</code> 结尾的包结构示例。这个描述对应的是 OICQ老协议，大约活跃在 2008 至 2015 年间。那时的 QQ 登录默认走 UDP 8000，UDP 被封锁则回退到 TCP 443。现代版本已经把这套协议替换掉了，老客户端里”在线传输方式 TCP&#x2F;UDP”的选项如今也已消失。</p>
+<p><strong>换句话说，照着老文章去抓 UDP 8000 会一无所获——这不是操作失误，而是那些资料已经过时了。</strong></p>
+<p>关于本机的网络环境：抓包显示本机地址为脱敏后的校园网内网地址，服务器地址为腾讯公网地址。所有流量均指向腾讯服务器，没有出现两台设备直接互连的情况。这与校园网的用户隔离策略有关——同一网段内的设备禁止互访，因此 QQ 的 P2P 直连无法建立，消息只能经服务器中转。</p>
+<p>这个现象恰好回应了课程里”计算机与计算机之间的通信真的发生在两台计算机之间吗”这个追问：<strong>大多数时候，答案是否定的。</strong> 所谓的”点对点”只是协议层面的一种优化尝试，成不成立取决于网络环境。</p>
+<h2 id="三、问题二：加密还是明文？"><a href="#三、问题二：加密还是明文？" class="headerlink" title="三、问题二：加密还是明文？"></a>三、问题二：加密还是明文？</h2><p><strong>结论：加密，且是 TLSv1.3。</strong></p>
+<p>在筛选出的数据包上右键选择「追踪流 → TCP 流」，Wireshark 会把该 TCP 连接的所有分段按序拼接，并尝试解析应用层协议。</p>
+<p><img src="/img/qq-wireshark/02-tls13.png" alt="TLSv1.3 加密追踪流"></p>
+<p>追踪流窗口内的信息给出了明确答案：</p>
+<ul>
+<li><strong>Protocol 列显示 <code>TLSv1.3</code></strong></li>
+<li><strong>Info 列记录了完整的握手与加密过程</strong>：<code>Client Hello (SN=xxx.tencent.com)</code> → <code>Server Hello, Change Cipher Spec</code> → <code>Application Data</code></li>
+</ul>
+<p>这里有几个值得解读的细节：</p>
+<p><strong>SNI 域名是明文的。</strong> 追踪流的十六进制视图里能直接读出 <code>xxx.tencent.com</code> 这样的域名。这是 TLS 握手的 Client Hello 阶段明文携带的，用于服务器选择——它无法加密，否则服务器不知道该把连接交给谁。</p>
+<p><strong>握手完成后全是乱码。</strong> 从 <code>Change Cipher Spec</code> 开始，双方协商出会话密钥，后续所有 <code>Application Data</code> 都是密文。在十六进制视图里表现为完全不可读的二进制。</p>
+<p><strong>列表中出现的 <code>Illegal Segments</code> 提示</strong>属于正常现象。这是因为抓包点不在数据通路上游，部分数据包已被网卡硬件卸载或分段处理，Wireshark 无法完整重组。遇到这种情况不必修改抓包设置。</p>
+<p>于是，这次抓包能得到什么、看不到什么，也就清楚了：</p>
+<table>
+<thead>
+<tr>
+<th>抓包能看到的</th>
+<th>抓包看不到的</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>通信对端的 IP 地址</td>
+<td>聊天文字内容</td>
+</tr>
+<tr>
+<td>SNI 域名（如 <code>xxx.tencent.com</code>）</td>
+<td>图片的具体内容</td>
+</tr>
+<tr>
+<td>通信时间与频率</td>
+<td>传输的原始文件名</td>
+</tr>
+<tr>
+<td>传输字节数与流量方向</td>
+<td>文件的实际数据</td>
+</tr>
+</tbody></table>
+<p><strong>一句话：抓包让你看见”谁在什么时候和你说了多久话”，看不见”说了什么”。这正是 TLS 存在的意义。</strong></p>
+<h2 id="四、问题三：能否恢复出明文传输的文件？"><a href="#四、问题三：能否恢复出明文传输的文件？" class="headerlink" title="四、问题三：能否恢复出明文传输的文件？"></a>四、问题三：能否恢复出明文传输的文件？</h2><h3 id="4-1-方法原理"><a href="#4-1-方法原理" class="headerlink" title="4.1 方法原理"></a>4.1 方法原理</h3><p>不同文件类型有固定的文件头特征码（magic number），可以作为文件开始的标志：</p>
+<table>
+<thead>
+<tr>
+<th align="left">文件类型</th>
+<th align="left">十六进制特征码</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">JPEG</td>
+<td align="left"><code>FF D8 FF</code></td>
+</tr>
+<tr>
+<td align="left">PNG</td>
+<td align="left"><code>89 50 4E 47</code></td>
+</tr>
+<tr>
+<td align="left">GIF</td>
+<td align="left"><code>47 49 46 38</code></td>
+</tr>
+<tr>
+<td align="left">ZIP</td>
+<td align="left"><code>50 4B 03 04</code></td>
+</tr>
+<tr>
+<td align="left">PDF</td>
+<td align="left"><code>25 50 44 46</code></td>
+</tr>
+</tbody></table>
+<p>在 Wireshark 里追踪 TCP 流，只要载荷未被加密，就能用 <code>Ctrl+F</code> 在十六进制视图中搜索这些特征码，定位文件在字节流中的起点，删除之前的协议头部分，剩下的即为文件本体。</p>
+<p><strong>这个方法成立有两个前提：① 载荷未加密；② 数据在同一条 TCP 流内。</strong></p>
+<h3 id="4-2-实际尝试：全部失败"><a href="#4-2-实际尝试：全部失败" class="headerlink" title="4.2 实际尝试：全部失败"></a>4.2 实际尝试：全部失败</h3><p>我在抓包中逐一搜索了上述特征码。</p>
+<p>搜索 JPEG 的 <code>FFD8FF</code>，搜索框变红，未找到。</p>
+<p><img src="/img/qq-wireshark/04-jpeg-magic.png" alt="搜索 JPEG 特征码未找到"></p>
+<p>搜索 PNG 的 <code>89504E47</code>，同样是未找到。</p>
+<p><img src="/img/qq-wireshark/05-png-magic.png" alt="搜索 PNG 特征码未找到"></p>
+<p>搜索 ZIP 的 <code>504B0304</code>，依然未找到。</p>
+<p><img src="/img/qq-wireshark/06-zip-magic.png" alt="搜索 ZIP 特征码未找到"></p>
+<p><strong>三次搜索全部失败。</strong></p>
+<p>原因不神秘：TLS 已经把这些字节彻底加密成了随机数据。在密文里搜索文件特征码，等于在一堆随机数中寻找规律——文件特征码是明文世界的产物，密文中不存在这个概念。</p>
+<p>这也解释了一个常见的网络传言。早期 QQ 协议使用 TEA 算法加密消息体，而 TEA 是对称加密。这意味着：只要拿到会话密钥，所有流量都可以被解密。而登录请求包在协商密钥之前就已发出，其中的密码摘要容易被离线暴力破解——破解者的本机运算速度可达每秒 10^6 至 10^8 次尝试。</p>
+<p><strong>这套攻击链条依赖的是弱加密与可离线验证的口令摘要。</strong> 现代版本全面转向 TLS 之后，这条路已经被堵死：没有密钥无法解密，而密钥交换本身由 TLS 的密钥协商机制保护。</p>
+<p><strong>结论是：在当前 QQ 版本上，”从流量中恢复出明文文件”这条路是走不通的。</strong> 这不是技巧问题，是加密的预期效果。</p>
+<h3 id="4-3-一次失败实验的记录"><a href="#4-3-一次失败实验的记录" class="headerlink" title="4.3 一次失败实验的记录"></a>4.3 一次失败实验的记录</h3><p>值得记录的是，特征码搜索并非在一开始就顺利的。</p>
+<p>最初的两次抓包几乎一无所获——数据包列表里全是长度 55 至 66 字节的包。查阅协议字段后确认，这些是TCP 层的 <strong>Keep-Alive 保活包</strong>，只用于维持连接，不携带任何应用层数据。</p>
+<p>原因很简单：抓包期间并没有真正收发任何消息。抓包是一个需要”配合”的动作——必须在数据包被捕获的瞬间产生流量，否则抓到的只有网络的心跳。</p>
+<p>第三次调整了顺序：先启动抓包，再执行发送操作，终于捕获到了真实的载荷。</p>
+<p><img src="/img/qq-wireshark/03-len406.png" alt="捕获到实际数据载荷"></p>
+<p>这条 Len&#x3D;406 的数据包来自某个 HTTP 服务（端口 80），说明同一份抓包文件中同时存在不同应用的不同传输方式：有的走加密的 443，有的走明文的 80。</p>
+<p><strong>这个观察引出另一个问题：同一台机器上，哪些流量是加密的，哪些是明文的？</strong></p>
+<p>Wireshark 的过滤器给出了一个粗略答案。用 QQ 服务器的 IP 做过滤并加上 <code>tcp.len &gt; 100</code> 的条件后，筛选结果与之前的对照形成了鲜明反差：</p>
+<table>
+<thead>
+<tr>
+<th align="left">流量类型</th>
+<th align="left">协议栈</th>
+<th align="left">内容可读性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">QQ 通信</td>
+<td align="left">TCP&#x2F;443 + TLSv1.3</td>
+<td align="left">握手后全为密文</td>
+</tr>
+<tr>
+<td align="left">某些网页服务</td>
+<td align="left">TCP&#x2F;80 + HTTP</td>
+<td align="left">响应头与正文均可直接阅读</td>
+</tr>
+</tbody></table>
+<p><strong>结论是：是否加密取决于具体应用，QQ 属于强制加密的那一类。</strong> 这也意味着，如果要演示”从流量中还原文件”这一手法，就不能选 QQ 作为样本——需要另找一个明文传输的场景。</p>
+<h3 id="4-4-明文场景的验证尝试"><a href="#4-4-明文场景的验证尝试" class="headerlink" title="4.4 明文场景的验证尝试"></a>4.4 明文场景的验证尝试</h3><p>为了验证特征码方法本身的有效性（而非仅仅展示一次失败），我在本机搭建了一个明文 HTTP 文件服务作为对照：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /d <span class="string">&quot;C:\Users\...\test&quot;</span></span><br><span class="line">python -m http.server 8080 --<span class="built_in">bind</span> 0.0.0.0</span><br></pre></td></tr></table></figure>
+
+<p>服务正常启动后，浏览器访问确实能看到文件内容——<strong>说明文件服务本身工作正常，文件确实以明文形式传输</strong>。</p>
+<p>然而后续抓包却一无所获，这段排查过程本身很有价值，记录三个关键发现：</p>
+<p><strong>其一，环回接口的流量不经过物理网卡。</strong> 最初通过 <code>127.0.0.1:8080</code> 访问，Wireshark 上完全没有对应流量。原因是环回（loopback）接口的数据在操作系统内核内部直接传递，不会流出到物理网卡。这是抓包的一个基本边界——<strong>抓包点必须落在流量实际经过的网卡上。</strong></p>
+<p><strong>其二，本机地址可能被防火墙拦截。</strong> 改用局域网地址 <code>10.34.x.x:8080</code> 访问后，连接被拒绝，说明该端口未在防火墙上放行。</p>
+<p><strong>其三，虚拟网卡是另一条独立通道。</strong> 本机装有 VMware，其虚拟网卡地址与 WiFi 地址属于完全不同的网络栈。从哪个地址发起访问，流量就走哪张网卡，用 Wireshark 抓错网卡自然一无所获。</p>
+<p>这三点合在一起说明了一件事：<strong>抓包不是”打开软件就有数据”，而是要先想清楚数据会经过哪条路径。</strong> 环回、虚拟网卡、物理网卡，Windows 上的网卡绑定与优先级设置，每一环都可能让流量”消失”。</p>
+<h2 id="五、PC-PC-端与-PC-手机端对照"><a href="#五、PC-PC-端与-PC-手机端对照" class="headerlink" title="五、PC-PC 端与 PC-手机端对照"></a>五、PC-PC 端与 PC-手机端对照</h2><p>作业要求覆盖两类场景。在校园网环境下，手机 QQ 与电脑 QQ 的通信能够正常建立，抓包结果与 PC-PC 场景一致：</p>
+<table>
+<thead>
+<tr>
+<th align="left">观察点</th>
+<th align="left">PC-PC 端</th>
+<th align="left">PC-手机端</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">建连方式</td>
+<td align="left">尝试 P2P，失败则经服务器中转</td>
+<td align="left">同左</td>
+</tr>
+<tr>
+<td align="left">传输层协议</td>
+<td align="left">TCP</td>
+<td align="left">TCP</td>
+</tr>
+<tr>
+<td align="left">目标端口</td>
+<td align="left">443</td>
+<td align="left">443</td>
+</tr>
+<tr>
+<td align="left">加密方式</td>
+<td align="left">TLSv1.3</td>
+<td align="left">TLSv1.3</td>
+</tr>
+<tr>
+<td align="left">可见信息</td>
+<td align="left">IP、端口、字节数、SNI</td>
+<td align="left">同左</td>
+</tr>
+</tbody></table>
+<p>两点补充说明：</p>
+<p><strong>关于 P2P 直连。</strong> 同一局域网下抓包时，如果能看到 QQ 直接连向对方 IP 的随机高位端口，说明 P2P 打洞成功。本次实验中未观察到这种情况，因为校园网的用户隔离策略阻止了同网段设备互访，所有流量都指向腾讯服务器。作为对照，在家庭网络环境下通常可以观察到直连流量。</p>
+<p><strong>关于图片与文件的落点。</strong> 手机端发送的图片，多数情况下是先上传到腾讯的 CDN 节点，再把URL 发送给对端，而不是直接在两台设备之间传输。这解释了为什么抓包时看到的是大量到 <code>qpic.cn</code> 相关地址的连接。</p>
+<h2 id="六、三个问题的答案汇总"><a href="#六、三个问题的答案汇总" class="headerlink" title="六、三个问题的答案汇总"></a>六、三个问题的答案汇总</h2><table>
+<thead>
+<tr>
+<th align="left">问题</th>
+<th align="left">答案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>UDP 还是 TCP</strong></td>
+<td align="left"><strong>TCP</strong>，端口 443。UDP 8000 属 2008–2015年老协议，已淘汰</td>
+</tr>
+<tr>
+<td align="left"><strong>加密还是明文</strong></td>
+<td align="left"><strong>加密</strong>，TLSv1.3。握手后全部为密文，仅 SNI 域名明文</td>
+</tr>
+<tr>
+<td align="left"><strong>能否恢复明文文件</strong></td>
+<td align="left"><strong>在 QQ 流量下不能</strong>。特征码搜索全部失败，原因是 TLS 加密</td>
+</tr>
+</tbody></table>
+<p>补一句关于第三问的说明：特征码方法本身是有效的，它失败的原因是加密破坏了两个前提之一（载荷未加密）。这与”用钥匙能开门，但门被锁住了”是一个道理——<strong>方法没错，是对象选错了。</strong> 若要演示这一手法，应当选择明文传输的场景（如 HTTP 下载），而非加密的即时通讯。</p>
+<h2 id="七、一点感想"><a href="#七、一点感想" class="headerlink" title="七、一点感想"></a>七、一点感想</h2><p>这次抓包最反直觉的收获，是那些流传甚广的”标准答案”有多不可靠。</p>
+<p>“QQ 用 UDP 8000”——错，那是十几年前的老协议，照着做只会一无所获。<br>“抓包能看到聊天内容”——错，现代通信全程加密，能看到的只有元信息。</p>
+<p>这两点都不是”我错了”，而是<strong>资料没有跟上技术演进</strong>。做网络分析时，动手验证的价值远大于采信二手结论。一个 <code>udp.port == 8000</code> 过滤器花不了三秒，但它比任何一篇十年前的文章都更能说明问题。</p>
+<p>另一个收获来自那些失败。抓不到保活包以外的数据，是因为抓包时没有真正收发消息；访问本地服务抓不到流量，是因为流量没走那张网卡。每一次失败都指向一个更基础的问题——<strong>数据到底在哪里，经过了谁。</strong> 搞清楚这个，比记住任何一条结论都重要。</p>
+<hr>
+<p>本文仅抓取本人自有账号、且仅在本机与本人设备之间进行，未使用 ARP 欺骗、中间人等手段获取他人流量。抓包文件仅保存在本地，未上传至任何公共平台。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://waterwater-blue.github.io">waterwater-blue</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://waterwater-blue.github.io/2026/10/18/qq-wireshark-analysis/">https://waterwater-blue.github.io/2026/10/18/qq-wireshark-analysis/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://waterwater-blue.github.io" target="_blank">waterwater-blue</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="post-meta__tags" href="/tags/%E6%8A%93%E5%8C%85%E5%88%86%E6%9E%90/">抓包分析</a><a class="post-meta__tags" href="/tags/Wireshark/">Wireshark</a></div><div class="post-share"><div class="social-share" data-image="/img/butterfly-icon.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">对等保2.0的理解</div></div><div class="info-2"><div class="info-item-1">网络安全等级保护制度是我国网络安全领域的基本制度。通过学习《网络安全法》及等级保护2.0系列标准，我对其出台背景、标准体系、核心要求和实践意义形成了如下认识。 一、等保2.0的出台背景与法律依据等级保护制度在我国已有十余年实践。2007年《信息安全等级保护管理办法》（公通字〔2007〕43号）发布，标志着等级保护1.0正式启动，确立了定级备案、建设整改、等级测评和监督检查四项”规定动作”，并以《信息系统安全等级保护基本要求》（GB&#x2F;T 22239-2008）为核心形成标准体系。 随着云计算、移动互联、物联网、工业控制和大数据等新技术新应用快速发展，传统以狭义信息系统为对象的保护模式已难以覆盖新风险。2017年6月《中华人民共和国网络安全法》正式施行，其第二十一条明确规定”国家实行网络安全等级保护制度”，第三十一条进一步规定对关键信息基础设施在等级保护基础上实行重点保护。法律的实施为等级保护制度赋予了新的内涵，也推动标准体系从1.0升级为2.0。 等保2.0并非对1.0的否定，而是在继承”分级保护、分等级施策”核心思想基础上的全面升级：保护对象更广、技术与管理要求更全、主...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-09-28</div><div class="info-item-2">对等保2.0的理解</div></div><div class="info-2"><div class="info-item-1">网络安全等级保护制度是我国网络安全领域的基本制度。通过学习《网络安全法》及等级保护2.0系列标准，我对其出台背景、标准体系、核心要求和实践意义形成了如下认识。 一、等保2.0的出台背景与法律依据等级保护制度在我国已有十余年实践。2007年《信息安全等级保护管理办法》（公通字〔2007〕43号）发布，标志着等级保护1.0正式启动，确立了定级备案、建设整改、等级测评和监督检查四项”规定动作”，并以《信息系统安全等级保护基本要求》（GB&#x2F;T 22239-2008）为核心形成标准体系。 随着云计算、移动互联、物联网、工业控制和大数据等新技术新应用快速发展，传统以狭义信息系统为对象的保护模式已难以覆盖新风险。2017年6月《中华人民共和国网络安全法》正式施行，其第二十一条明确规定”国家实行网络安全等级保护制度”，第三十一条进一步规定对关键信息基础设施在等级保护基础上实行重点保护。法律的实施为等级保护制度赋予了新的内涵，也推动标准体系从1.0升级为2.0。 等保2.0并非对1.0的否定，而是在继承”分级保护、分等级施策”核心思想基础上的全面升级：保护对象更广、技术与管理要求更全、主...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">waterwater-blue</div><div class="author-info-description">waterwater-blue 的个人博客</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/waterwater-blue" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83%E4%B8%8E%E6%96%B9%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一、实验环境与方法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E9%97%AE%E9%A2%98%E4%B8%80%EF%BC%9AUDP-%E8%BF%98%E6%98%AF-TCP%EF%BC%9F"><span class="toc-number">2.</span> <span class="toc-text">二、问题一：UDP 还是 TCP？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E9%97%AE%E9%A2%98%E4%BA%8C%EF%BC%9A%E5%8A%A0%E5%AF%86%E8%BF%98%E6%98%AF%E6%98%8E%E6%96%87%EF%BC%9F"><span class="toc-number">3.</span> <span class="toc-text">三、问题二：加密还是明文？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E9%97%AE%E9%A2%98%E4%B8%89%EF%BC%9A%E8%83%BD%E5%90%A6%E6%81%A2%E5%A4%8D%E5%87%BA%E6%98%8E%E6%96%87%E4%BC%A0%E8%BE%93%E7%9A%84%E6%96%87%E4%BB%B6%EF%BC%9F"><span class="toc-number">4.</span> <span class="toc-text">四、问题三：能否恢复出明文传输的文件？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E6%96%B9%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 方法原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E5%AE%9E%E9%99%85%E5%B0%9D%E8%AF%95%EF%BC%9A%E5%85%A8%E9%83%A8%E5%A4%B1%E8%B4%A5"><span class="toc-number">4.2.</span> <span class="toc-text">4.2 实际尝试：全部失败</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E4%B8%80%E6%AC%A1%E5%A4%B1%E8%B4%A5%E5%AE%9E%E9%AA%8C%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 一次失败实验的记录</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-%E6%98%8E%E6%96%87%E5%9C%BA%E6%99%AF%E7%9A%84%E9%AA%8C%E8%AF%81%E5%B0%9D%E8%AF%95"><span class="toc-number">4.4.</span> <span class="toc-text">4.4 明文场景的验证尝试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81PC-PC-%E7%AB%AF%E4%B8%8E-PC-%E6%89%8B%E6%9C%BA%E7%AB%AF%E5%AF%B9%E7%85%A7"><span class="toc-number">5.</span> <span class="toc-text">五、PC-PC 端与 PC-手机端对照</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E4%B8%89%E4%B8%AA%E9%97%AE%E9%A2%98%E7%9A%84%E7%AD%94%E6%A1%88%E6%B1%87%E6%80%BB"><span class="toc-number">6.</span> <span class="toc-text">六、三个问题的答案汇总</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E4%B8%80%E7%82%B9%E6%84%9F%E6%83%B3"><span class="toc-number">7.</span> <span class="toc-text">七、一点感想</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/18/qq-wireshark-analysis/" title="用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？">用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？</a><time datetime="2026-10-18T11:40:00.000Z" title="发表于 2026-10-18 19:40:00">2026-10-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解">对等保2.0的理解</a><time datetime="2026-09-28T12:30:00.000Z" title="发表于 2026-09-28 20:30:00">2026-09-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/09/28/hello-world/" title="你好，世界">你好，世界</a><time datetime="2026-09-28T06:30:00.000Z" title="发表于 2026-09-28 14:30:00">2026-09-28</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By waterwater-blue</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

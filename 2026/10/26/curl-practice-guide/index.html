@@ -1,0 +1,550 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>curl 实战全记录：用 8 个场景把 HTTP 调试讲透 | waterwater-blue</title><meta name="author" content="waterwater-blue"><meta name="copyright" content="waterwater-blue"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="fff7fa"><meta name="description" content="curl 是开发者调试 HTTP 接口、排查网络问题、写自动化脚本最常用的命令行工具。本文不抄手册，而是把 curl 拆成 8 个真实使用场景：看懂请求生命周期、只取数据、定制请求头、发送 JSON 与文件、维护 Cookie 会话、处理认证、大文件传输与断点续传、以及线上排障。每个场景都有真实终端截图、参数逐项解释和踩坑提示。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="curl 实战全记录：用 8 个场景把 HTTP 调试讲透">
+<meta property="og:url" content="https://waterwater-blue.github.io/2026/10/26/curl-practice-guide/index.html">
+<meta property="og:site_name" content="waterwater-blue">
+<meta property="og:description" content="curl 是开发者调试 HTTP 接口、排查网络问题、写自动化脚本最常用的命令行工具。本文不抄手册，而是把 curl 拆成 8 个真实使用场景：看懂请求生命周期、只取数据、定制请求头、发送 JSON 与文件、维护 Cookie 会话、处理认证、大文件传输与断点续传、以及线上排障。每个场景都有真实终端截图、参数逐项解释和踩坑提示。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://waterwater-blue.github.io/img/butterfly-icon.png">
+<meta property="article:published_time" content="2026-10-26T14:38:00.000Z">
+<meta property="article:modified_time" content="2026-10-26T14:38:00.000Z">
+<meta property="article:author" content="waterwater-blue">
+<meta property="article:tag" content="curl">
+<meta property="article:tag" content="网络安全">
+<meta property="article:tag" content="网络分析">
+<meta property="article:tag" content="随笔">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://waterwater-blue.github.io/img/butterfly-icon.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": ""curl 实战全记录：用 8 个场景把 HTTP 调试讲透"",
+  "url": "https://waterwater-blue.github.io/2026/10/26/curl-practice-guide/",
+  "image": "https://waterwater-blue.github.io/img/butterfly-icon.png",
+  "datePublished": "2026-10-26T14:38:00.000Z",
+  "dateModified": "2026-10-26T14:38:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "waterwater-blue",
+      "url": "https://waterwater-blue.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.ico"><link rel="canonical" href="https://waterwater-blue.github.io/2026/10/26/curl-practice-guide/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', 'fff7fa')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 8.1.2"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">waterwater-blue</span></a><a class="nav-page-title" href="/"><span class="site-name">用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">curl 实战全记录：用 8 个场景把 HTTP 调试讲透</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-26T14:38:00.000Z" title="发表于 2026-10-26 22:38:00">2026-10-26</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-26T14:38:00.000Z" title="更新于 2026-10-26 22:38:00">2026-10-26</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%88%86%E6%9E%90/">网络分析</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><blockquote><p>curl（Client URL）是一款功能强大的命令行工具，用于在客户端与服务器之间传输数据。它支持 HTTP、HTTPS、FTP、SFTP 等 20 多种协议，是开发者进行 API 调试、网络问题排查和自动化脚本编写的核心工具。</p><p>这篇文章不抄手册。我把 curl 拆成 8 个真实使用场景，每个场景都跑一遍、看输出、解释参数、记录踩到的坑。所有截图都是本地终端的真实执行结果。</p></blockquote>
+<hr>
+<h2 id="为什么要认真对待-curl"><a href="#为什么要认真对待-curl" class="headerlink" title="为什么要认真对待 curl"></a>为什么要认真对待 curl</h2>
+<p>很多人觉得 curl 就是个"下载工具"，<code>curl 网址</code> 完事。但真正用起来会发现：</p>
+<ul>
+<li><strong>它是唯一能在没有 GUI 的环境里调试 HTTP 的工具</strong> —— 服务器上没浏览器、CI 流水线里没 Postman，curl 一直在。</li>
+<li><strong>它能替代一整个测试流程</strong> —— 判断状态码、验证响应头、模拟登录态、测大文件下载速度，这些都能一条命令搞定。</li>
+<li><strong>它是脚本化的天然选择</strong> —— 退出码语义清晰，配合 <code>&amp;&amp;</code> / <code>||</code> 就能写出自愈的运维脚本。</li>
+</ul>
+<p>而且 curl 的命令行语法是"组合式"的：每个参数只干一件事，靠排列组合覆盖各种场景。<strong>用熟 curl，等于同时学会了 HTTP 客户端的全部姿势。</strong></p>
+<p>本文的实验环境：</p>
+<table><thead><tr><th>项目</th><th>版本 / 说明</th></tr></thead><tbody><tr><td>curl</td><td>8.21.0（Windows，Schannel TLS 后端）</td></tr><tr><td>Shell</td><td>Git Bash on Windows</td></tr><tr><td>演示服务</td><td>本地 mock API（<code>127.0.0.1:8765</code>）+ 真实 GitHub API</td></tr><tr><td>时间</td><td>2026-10-26</td></tr></tbody></table>
+<blockquote><p><strong>关于本地 mock 服务</strong>：为了让重定向链、Cookie 会话、Range 断点续传这些行为<strong>可复现</strong>（公共测试站点如 httpbin.org 时不时变慢或限流），我在本地用 Python 写了一个小型 mock API，模拟了用户接口、登录态、受保护资源、大文件分片、慢响应等端点。所有截图中的请求与响应都是真实传输的，只是服务器是我自己起的。这不是为了"造假"，而是为了让每一个字节的行为都<strong>可控、可复现、可解释</strong> —— 公共站点的行为随时可能变，而教学需要确定性。</p></blockquote>
+<hr>
+<h2 id="场景一-用--v--w-看清一次请求的完整生命周期"><a href="#场景一-用--v--w-看清一次请求的完整生命周期" class="headerlink" title="场景一：用 `-v` + `-w` 看清一次请求的完整生命周期"></a>场景一：用 `-v` + `-w` 看清一次请求的完整生命周期</h2>
+<p>排查问题的第一步，是把黑盒变白盒。<code>-v</code>（verbose）把 curl 内部做的每一步都打印出来：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -v -s -o /dev/null http://127.0.0.1:8765/api/user</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene1.png" alt="场景一：verbose 输出与耗时分解"></p>
+<p>输出里三类前缀各有含义，这是读懂 <code>-v</code> 的关键：</p>
+<table><thead><tr><th>前缀</th><th>含义</th><th>典型内容</th></tr></thead><tbody><tr><td><code>*</code></td><td>curl 的内部动作</td><td>DNS 解析、TCP 连接、TLS 握手、连接复用</td></tr><tr><td><code>&gt;</code></td><td><strong>真正发出去的</strong>请求行与请求头</td><td><code>GET /api/user HTTP/1.1</code>、<code>Host:</code>、<code>User-Agent:</code></td></tr><tr><td><code>&lt;</code></td><td><strong>服务器回给</strong>我们的响应行与响应头</td><td><code>HTTP/1.1 200 OK</code>、<code>Content-Type:</code></td></tr></tbody></table>
+<p>把 <code>-v</code> 的输出当"请求构造器"和"响应解剖刀"来用：你要发什么头，服务器到底返回了什么，一目了然。</p>
+<h3 id="w-把指标变成可编程的数据"><a href="#w-把指标变成可编程的数据" class="headerlink" title="`-w` 把指标变成可编程的数据"></a>`-w` 把指标变成可编程的数据</h3>
+<p><code>-v</code> 适合人看，<strong><code>-w</code>（--write-out）适合脚本用</strong>。它在传输结束后按模板输出自定义指标：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -o /dev/null -w '状态码=%{http_code}  总耗时=%{time_total}s  体积=%{size_download}B  速度=%{speed_download}B/s\n' \
+  http://127.0.0.1:8765/api/user</pre></td></tr></table></figure>
+<p>输出：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>状态码=200  总耗时=0.001794s  体积=202B  速度=112723B/s</pre></td></tr></table></figure>
+<p>常用的 <code>%{}</code> 变量：</p>
+<table><thead><tr><th>变量</th><th>含义</th></tr></thead><tbody><tr><td><code>%{http_code}</code></td><td>HTTP 状态码</td></tr><tr><td><code>%{time_total}</code></td><td>总耗时（秒）</td></tr><tr><td><code>%{time_namelookup}</code></td><td>DNS 解析耗时</td></tr><tr><td><code>%{time_connect}</code></td><td>TCP 连接建立耗时</td></tr><tr><td><code>%{time_appconnect}</code></td><td><strong>TLS 握手</strong>耗时（HTTPS 才非零）</td></tr><tr><td><code>%{time_starttransfer}</code></td><td>TTFB，首字节时间（= 服务端处理耗时）</td></tr><tr><td><code>%{size_download}</code></td><td>下载字节数</td></tr><tr><td><code>%{speed_download}</code></td><td>平均下载速度（B/s）</td></tr><tr><td><code>%{num_redirects}</code></td><td>跳转次数</td></tr><tr><td><code>%{url_effective}</code></td><td>最终生效的 URL</td></tr></tbody></table>
+<p>把这几个时间拆开看，是性能排查的基本功：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>dns=0.000061s  connect=0.000927s  tls=0.000000s  ttfb=0.001596s  total=0.001651s</pre></td></tr></table></figure>
+<p><code>ttfb</code> 占了大头，说明瓶颈在<strong>服务端处理</strong>而不是网络；反过来如果 <code>time_connect</code> 很大，那问题在网络链路上。</p>
+<blockquote><p><strong>坑</strong>：<code>-v</code> 和 <code>-w</code> 都往 stdout 写东西。想让 <code>-v</code> 的日志不污染响应体，记得把响应体 <code>-o</code> 到文件或 <code>/dev/null</code>；或者用 <code>-v -o /dev/null -w '...'</code> 的组合。</p></blockquote>
+<hr>
+<h2 id="场景二-只取数据--s-静音--o-存档-json-结构化"><a href="#场景二-只取数据--s-静音--o-存档-json-结构化" class="headerlink" title="场景二：只取数据 —— `-s` 静音、`-o` 存档、`%{json}` 结构化"></a>场景二：只取数据 —— `-s` 静音、`-o` 存档、`%{json}` 结构化</h2>
+<p>日常最常见的需求其实很朴素：把一个接口的数据抓下来存好。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s https://api.github.com/users/octocat -o octocat.json</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene2.png" alt="场景二：抓取真实 API 与结构化指标"></p>
+<p>几个高频参数：</p>
+<ul>
+<li><strong><code>-s</code>（--silent）</strong>：关掉进度条和错误信息。但注意 —— <code>-s</code> 会把错误信息也一起吞掉，如果需要保留错误提示，用 <code>-sS</code>：<code>-s</code> 静音但保留错误（<code>S</code> = show errors）。</li>
+<li><strong><code>-o 文件名</code></strong>：把响应体写入文件。文件名固定时用它。</li>
+<li><strong><code>-O</code></strong>：用 URL 里的文件名保存（<code>https://x.com/a.zip</code> → 存成 <code>a.zip</code>）。这是"下载文件"最省事的方式。</li>
+<li><strong><code>-J</code></strong>：配合 <code>-O</code> 使用，优先采用服务器 <code>Content-Disposition</code> 头里指定的文件名。</li>
+<li><strong><code>-D -</code></strong>：把响应头打印到 stdout，响应体丢弃。只想看响应头时用。</li>
+</ul>
+<h3 id="w-json-是被低估的功能"><a href="#w-json-是被低估的功能" class="headerlink" title="`-w '%{json}'` 是被低估的功能"></a>`-w '%{json}'` 是被低估的功能</h3>
+<p>curl 7.70 之后，<code>-w</code> 支持 <code>%{json}</code>，一次性把所有可用指标导出成 JSON：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -o /dev/null -w '%{json}' http://127.0.0.1:8765/api/user | \
+  python -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({k:d[k] for k in ['http_code','time_total','size_download','content_type','remote_ip']}, indent=2))"</pre></td></tr></table></figure>
+<p>输出：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "http_code": 200,
+  "time_total": 0.001845,
+  "size_download": 202,
+  "content_type": "application/json",
+  "remote_ip": "127.0.0.1"
+}</pre></td></tr></table></figure>
+<p>这意味着<strong>不用再手写 <code>-w</code> 模板去拼字符串</strong>，curl 本身就吐结构化数据，接 jq 或 Python 直接处理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -o /dev/null -w '%{json}' https://api.github.com/users/octocat | jq '.http_code, .time_total'</pre></td></tr></table></figure>
+<hr>
+<h2 id="场景三-定制请求--h--a--e--b"><a href="#场景三-定制请求--h--a--e--b" class="headerlink" title="场景三：定制请求 —— `-H`、`-A`、`-e`、`-b`"></a>场景三：定制请求 —— `-H`、`-A`、`-e`、`-b`</h2>
+<p>真实世界的接口很少"裸奔"。总要带认证头、自定义 UA、追踪 ID。curl 用 <code>-H</code> 覆盖任意请求头：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -H 'X-Api-Version: 2026-10-26' -H 'X-Trace-Id: demo-0001' \
+     -A 'MyApp/2.1 (curl-course)' -e 'https://example.com/dashboard' \
+     -b 'session=demo-session-token-8f3a2c' \
+     http://127.0.0.1:8765/api/headers</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene3.png" alt="场景三：自定义请求头与服务器回显"></p>
+<p>服务器把我们发的头<strong>原样回显</strong>了，说明头确实送达，一个都没丢：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "method": "GET",
+  "headers": {
+    "Host": "127.0.0.1:8765",
+    "User-Agent": "MyApp/2.1 (curl-course)",
+    "Accept": "*/*",
+    "Referer": "https://example.com/dashboard",
+    "Cookie": "session=demo-session-token-8f3a2c",
+    "X-Api-Version": "2026-10-26",
+    "X-Trace-Id": "demo-0001"
+  }
+}</pre></td></tr></table></figure>
+<p>几个专用参数其实是 <code>-H</code> 的语法糖，记起来更省事：</p>
+<table><thead><tr><th>参数</th><th>等价写法</th><th>用途</th></tr></thead><tbody><tr><td><code>-A 'UA'</code></td><td><code>-H 'User-Agent: UA'</code></td><td>设置 User-Agent</td></tr><tr><td><code>-e 'URL'</code></td><td><code>-H 'Referer: URL'</code></td><td>设置 Referer</td></tr><tr><td><code>-b 'k=v'</code></td><td><code>-H 'Cookie: k=v'</code></td><td>带 Cookie</td></tr><tr><td><code>-H 'X:'</code></td><td>——</td><td><strong>删除</strong>该请求头</td></tr></tbody></table>
+<p>最后这条特别实用：有些服务器（如 CDN、WAF）对 <code>User-Agent</code> 有策略，改一下就能绕过；而用 <code>-H 'User-Agent:'</code> 可以<strong>彻底移除</strong>这个头 —— 很多默认拒绝空 UA 的网关，反而只接受"没有 UA"的请求。</p>
+<blockquote><p><strong>坑</strong>：<code>curl</code> 发送的头默认包含 <code>User-Agent</code> 和 <code>Accept: */*</code>。如果你要做严格的请求比对测试，记得用 <code>-H 'User-Agent:' -H 'Accept:'</code> 把它们删掉。</p></blockquote>
+<hr>
+<h2 id="场景四-发送数据-post-json-表单-文件上传"><a href="#场景四-发送数据-post-json-表单-文件上传" class="headerlink" title="场景四：发送数据 —— POST JSON、表单、文件上传"></a>场景四：发送数据 —— POST JSON、表单、文件上传</h2>
+<p><code>-d</code>（--data）是发请求体的主力。它有三个容易搞混的点。</p>
+<h3 id="d-默认用-post"><a href="#d-默认用-post" class="headerlink" title="`-d` 默认用 POST"></a>`-d` 默认用 POST</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -d 'user=octocat&amp;action=login&amp;token=abc123' http://127.0.0.1:8765/api/form</pre></td></tr></table></figure>
+<p><code>-d</code> 自动使用 <code>POST</code> 方法，<code>Content-Type</code> 默认是 <code>application/x-www-form-urlencoded</code>。服务器收到的是：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "received_ctype": "application/x-www-form-urlencoded",
+  "form": { "user": "octocat", "action": "login", "token": "abc123" }
+}</pre></td></tr></table></figure>
+<h3 id="发-json-必须显式声明-content-type"><a href="#发-json-必须显式声明-content-type" class="headerlink" title="发 JSON 必须显式声明 Content-Type"></a>发 JSON 必须显式声明 Content-Type</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -X POST -H 'Content-Type: application/json' \
+     -d '{"name":"curl","year":1998,"feature":true}' \
+     http://127.0.0.1:8765/api/json</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene4.png" alt="场景四：JSON、表单、文件上传"></p>
+<p><strong>这是最常见的踩坑点。</strong> 不写 <code>-H 'Content-Type: application/json'</code>，服务器收到的是 <code>application/x-www-form-urlencoded</code>，它会把你这段 JSON 当成一个普通字符串字段，而不是对象。反过来，你也可以用 <code>--json '{"a":1}'</code>（curl 7.82+），它会自动设好 Content-Type 并把数字/布尔值正确序列化。</p>
+<h3 id="f-上传文件--d-发文本"><a href="#f-上传文件--d-发文本" class="headerlink" title="`-F` 上传文件，`-d` 发文本"></a>`-F` 上传文件，`-d` 发文本</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -F 'file=@upload_demo.txt' -F 'kind=text' http://127.0.0.1:8765/api/upload</pre></td></tr></table></figure>
+<p><code>-F</code> 会自动包成 <code>multipart/form-data</code>，<code>@</code> 读本地文件。服务器确认收到：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "uploaded": true,
+  "filename": "upload_demo.txt",
+  "content_bytes": 28,
+  "multipart": true
+}</pre></td></tr></table></figure>
+<blockquote><p><strong>坑</strong>：<code>-d</code> 和 <code>-F</code> <strong>不能同时使用</strong>，curl 会直接报错。需要同时传文件和字段，就全用 <code>-F</code>；需要 JSON，就全用 <code>-d</code> + 显式 Content-Type。</p></blockquote>
+<p>其它数据来源选项：</p>
+<table><thead><tr><th>写法</th><th>作用</th></tr></thead><tbody><tr><td><code>-d @file</code></td><td>从文件读内容作为请求体</td></tr><tr><td><code>-d @-</code></td><td>从标准输入读（配合管道）</td></tr><tr><td><code>-T file</code></td><td>上传文件（PUT 语义）</td></tr><tr><td><code>--data-urlencode 'k=v'</code></td><td>URL 编码，处理特殊字符</td></tr></tbody></table>
+<hr>
+<h2 id="场景五-会话与重定向--c--b--l"><a href="#场景五-会话与重定向--c--b--l" class="headerlink" title="场景五：会话与重定向 —— `-c`、`-b`、`-L`"></a>场景五：会话与重定向 —— `-c`、`-b`、`-L`</h2>
+<p>浏览器有 Cookie 罐子，curl 也有。用 <code>-c</code> 保存、<code>-b</code> 携带：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># ① 登录，服务器下发 Set-Cookie，存进 jar.txt
+curl -s -c jar.txt http://127.0.0.1:8765/api/login
+
+# ② 不带 Cookie 访问受保护接口 → 401
+curl -s -o /dev/null -w '状态码=%{http_code}\n' http://127.0.0.1:8765/api/dashboard
+
+# ③ 带上 Cookie 罐子再试 → 200
+curl -s -b jar.txt http://127.0.0.1:8765/api/dashboard</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene5.png" alt="场景五：Cookie 会话与重定向"></p>
+<p><code>jar.txt</code> 是标准 Netscape 格式的 Cookie 文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># Netscape HTTP Cookie File
+#HttpOnly_127.0.0.1	FALSE	/	FALSE	1793022268	session	demo-session-token-8f3a2c</pre></td></tr></table></figure>
+<p><strong>关键点</strong>：curl 会话状态不自动跨命令保持。<code>-c</code> 是<strong>写</strong>，<code>-b</code> 是<strong>读</strong>，两步必须显式配合。而 <code>-b jar.txt</code> 同时也会把文件里的 Cookie 发出去 —— 它是"读+发"两件事。</p>
+<h3 id="重定向-默认不跟随"><a href="#重定向-默认不跟随" class="headerlink" title="重定向：默认不跟随"></a>重定向：默认不跟随</h3>
+<p>这是另一个高频误解。curl <strong>默认不跟随</strong> 3xx 跳转，只会把 <code>302</code> 和 <code>Location</code> 头给你：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -o /dev/null -D - http://127.0.0.1:8765/redirect/2</pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>HTTP/1.1 302 Found
+Server: MockAPI/1.0
+Content-Type: text/plain</pre></td></tr></table></figure>
+<p>加 <code>-L</code>（--location）才真正跟随跳转：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -L -o /dev/null -w '最终URL=%{url_effective}\n跳转次数=%{num_redirects}\n' \
+  http://127.0.0.1:8765/redirect/2</pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>最终URL=http://127.0.0.1:8765/redirect/0
+跳转次数=2</pre></td></tr></table></figure>
+<blockquote><p><strong>安全提示</strong>：<code>-L</code> 会跟随跳转，<strong>包括跳到不同域名</strong>。如果请求里带了 <code>-b</code> 的敏感 Cookie，理论上可能被重定向到别的站点泄露。严格场景用 <code>--location-trusted</code> 之外的方式，或干脆手动分步请求。</p><p>另外记得给 <code>-L</code> 配 <code>--max-redirs N</code>（默认上限 50），防止重定向死循环。</p></blockquote>
+<hr>
+<h2 id="场景六-认证-basic-与-bearer"><a href="#场景六-认证-basic-与-bearer" class="headerlink" title="场景六：认证 —— Basic 与 Bearer"></a>场景六：认证 —— Basic 与 Bearer</h2>
+<h3 id="basic-认证--u"><a href="#basic-认证--u" class="headerlink" title="Basic 认证：`-u`"></a>Basic 认证：`-u`</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -u 'demo:s3cret' http://127.0.0.1:8765/api/basic</pre></td></tr></table></figure>
+<p><code>-u user:pass</code> 会自动拼装 <code>Authorization: Basic base64(user:pass)</code>。</p>
+<p>密码写错时，<strong>明确返回 401</strong>，而不是静默失败：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -u 'demo:wrong' -w '\n状态码=%{http_code}\n' http://127.0.0.1:8765/api/basic</pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "error": "invalid credentials"
+}
+状态码=401</pre></td></tr></table></figure>
+<h3 id="bearer-token--h"><a href="#bearer-token--h" class="headerlink" title="Bearer Token：`-H`"></a>Bearer Token：`-H`</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -H 'Authorization: Bearer demo-session-token-8f3a2c' \
+  http://127.0.0.1:8765/api/secure</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene6.png" alt="场景六：Basic 与 Bearer 认证"></p>
+<p>令牌错误返回 403，且响应体回显了它<strong>实际收到的值</strong>，这在排查"请求头到底送出去没有"时非常有用：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>{
+  "error": "forbidden",
+  "received": "Bearer bad-token"
+}</pre></td></tr></table></figure>
+<p>其它常见认证方式：</p>
+<table><thead><tr><th>参数</th><th>说明</th></tr></thead><tbody><tr><td><code>-u user:pass</code></td><td>Basic 认证</td></tr><tr><td><code>--digest</code></td><td>Digest 认证</td></tr><tr><td><code>-H 'Authorization: Bearer xxx'</code></td><td>Bearer Token</td></tr><tr><td><code>--oauth2-bearer xxx</code></td><td>OAuth2</td></tr><tr><td><code>-n/--netrc-file</code></td><td>从 <code>.netrc</code> 文件读账号密码</td></tr><tr><td><code>--cert client.pem --key key.pem</code></td><td>客户端证书</td></tr></tbody></table>
+<blockquote><p>⚠ <strong>安全提醒</strong>：别把真令牌写死在命令行里 —— <code>ps</code> 能看到所有进程的启动参数，等于把密钥公开给同一台机器上的任何用户。更安全的做法是：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># 方式一：环境变量
+curl -H "Authorization: Bearer $TOKEN" https://api.example.com/me
+
+# 方式二：配置文件（权限设成 600）
+curl --config ~/.curlrc https://api.example.com/me</pre></td></tr></table></figure><p>记得在 shell 历史里也清理掉（<code>history -d</code>）。</p></blockquote>
+<hr>
+<h2 id="场景七-文件传输-下载-断点续传-限速-压缩"><a href="#场景七-文件传输-下载-断点续传-限速-压缩" class="headerlink" title="场景七：文件传输 —— 下载、断点续传、限速、压缩"></a>场景七：文件传输 —— 下载、断点续传、限速、压缩</h2>
+<h3 id="下载与断点续传"><a href="#下载与断点续传" class="headerlink" title="下载与断点续传"></a>下载与断点续传</h3>
+<p>大文件下载中断（比如网络抖动）后，最烦的就是从头再来。curl 的 <code>-C -</code> 能从断点继续：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># ① 下载完整文件
+curl -s http://127.0.0.1:8765/api/bigfile -o big.bin
+
+# ② 模拟中断：只取前 100KB
+curl -s -r 0-102400 http://127.0.0.1:8765/api/bigfile -o part.bin
+# → 已下载 102401 字节
+
+# ③ 从断点续传
+curl -s -C - http://127.0.0.1:8765/api/bigfile -o part.bin
+# → 本次续传 3043327 字节，HTTP 206
+# → 续传完成: 3145728 字节（与完整文件一致）</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene7.png" alt="场景七：下载、续传、限速、压缩"></p>
+<p>注意 <strong>HTTP 206 Partial Content</strong> 这个状态码 —— 续传成功的标志。curl 会自动带上 <code>Range: bytes=102401-</code> 头，服务器返回剩余部分，curl 追加写入原文件。前提是<strong>服务器必须支持 Range</strong>（返回 <code>Accept-Ranges: bytes</code>）。</p>
+<h3 id="限速---limit-rate"><a href="#限速---limit-rate" class="headerlink" title="限速：`--limit-rate`"></a>限速：`--limit-rate`</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s --limit-rate 40k http://127.0.0.1:8765/api/slow?seconds=3 -o /dev/null -w '限速 40KB/s → 耗时 %{time_total}s\n'
+# → 限速 40KB/s → 耗时 5.014881s
+
+curl -s http://127.0.0.1:8765/api/slow?seconds=3 -o /dev/null -w '不限速 → 耗时 %{time_total}s\n'
+# → 不限速 → 耗时 4.539074s</pre></td></tr></table></figure>
+<p>限速后耗时被明显拉长。这个参数在<strong>测速</strong>时反向使用：如果你要给客户演示"在 2Mbps 带宽下页面多慢"，加 <code>--limit-rate 2k</code> 就能模拟出来，不必真的去限速自己的网络。</p>
+<h3 id="压缩协商---compressed"><a href="#压缩协商---compressed" class="headerlink" title="压缩协商：`--compressed`"></a>压缩协商：`--compressed`</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s --compressed http://127.0.0.1:8765/api/gzip -o gz1.json -w '传输字节=%{size_download}\n'
+# → 传输字节=66
+
+curl -s http://127.0.0.1:8765/api/gzip -o gz2.json -w '传输字节=%{size_download}\n'
+# → 传输字节=445</pre></td></tr></table></figure>
+<p>两次落盘的<strong>文件内容完全一致</strong>（<code>cmp -s</code> 验证通过），但网络上传输的字节差了 6 倍多。原因：</p>
+<ul>
+<li>加 <code>--compressed</code> → curl 自动发 <code>Accept-Encoding: gzip</code>，服务器回 gzip 压缩体（66 字节），curl 在<strong>本地自动解压</strong></li>
+<li>不加 → 服务器直接回明文（445 字节）</li>
+</ul>
+<blockquote><p><strong>坑</strong>：不加 <code>--compressed</code> 时，服务器如果返回了 gzip 压缩体，你会看到一堆乱码 —— 因为 curl 不会自动解压。排查"接口返回乱码"时，先确认这个。</p></blockquote>
+<hr>
+<h2 id="场景八-线上排障组合拳--f---retry-超时---trace-ascii"><a href="#场景八-线上排障组合拳--f---retry-超时---trace-ascii" class="headerlink" title="场景八：线上排障组合拳 —— `-f`、`--retry`、超时、`--trace-ascii`"></a>场景八：线上排障组合拳 —— `-f`、`--retry`、超时、`--trace-ascii`</h2>
+<h3 id="f---fail-让-http-错误变成退出码"><a href="#f---fail-让-http-错误变成退出码" class="headerlink" title="`-f`（--fail）：让 HTTP 错误变成退出码"></a>`-f`（--fail）：让 HTTP 错误变成退出码</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s -f http://127.0.0.1:8765/api/status/404 -w '状态码=%{http_code}\n'; echo "退出码=$?"</pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>状态码=404
+退出码=22</pre></td></tr></table></figure>
+<p><strong>这是脚本化的关键</strong>。默认情况下 curl 遇到 404/500 依然返回退出码 0，脚本会误判"一切正常"。加了 <code>-f</code>，4xx/5xx 会返回非零退出码，于是：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>if ! curl -fsS "$API/health" -o /dev/null; then
+  echo "健康检查失败，触发告警"
+  exit 1
+fi</pre></td></tr></table></figure>
+<p>注意 <code>-f</code> 配合 <code>-sS</code> 一起用：<code>-s</code> 静音，但 <code>S</code> 保留错误信息（否则出错时你什么也看不到，只知道退出码非零）。</p>
+<h3 id="retry-网络抖动自动重试"><a href="#retry-网络抖动自动重试" class="headerlink" title="`--retry`：网络抖动自动重试"></a>`--retry`：网络抖动自动重试</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s --retry 2 --retry-delay 1 --retry-connrefused \
+  -o /dev/null -w '最终 %{http_code}\n' http://127.0.0.1:8765/api/status/500</pre></td></tr></table></figure>
+<p>常用搭配：</p>
+<table><thead><tr><th>参数</th><th>说明</th></tr></thead><tbody><tr><td><code>--retry N</code></td><td>重试次数</td></tr><tr><td><code>--retry-delay N</code></td><td>固定间隔秒数</td></tr><tr><td><code>--retry-max-time N</code></td><td>总重试时间上限</td></tr><tr><td><code>--retry-connrefused</code></td><td>连接被拒也重试（默认<strong>不</strong>重试这类错误）</td></tr><tr><td><code>--retry-all-errors</code></td><td>配合 <code>-f</code> 时，4xx/5xx 也重试（curl 7.71+）</td></tr></tbody></table>
+<h3 id="超时-两个参数管两件事"><a href="#超时-两个参数管两件事" class="headerlink" title="超时：两个参数管两件事"></a>超时：两个参数管两件事</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># --max-time 限制整体耗时
+curl -s --max-time 2 http://127.0.0.1:8765/api/slow?seconds=6 -o /dev/null -w '状态码=%{http_code}\n'; echo "退出码=$?"
+# → 状态码=200
+# → 退出码=28</pre></td></tr></table></figure>
+<p><img src="/img/curl-practice/scene8.png" alt="场景八：排障组合拳"></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># --connect-timeout 只限制连接建立阶段
+curl -s --connect-timeout 3 http://127.0.0.1:9/nope -w '状态码=%{http_code}\n'; echo "退出码=$?"
+# → 状态码=000
+# → 退出码=7</pre></td></tr></table></figure>
+<p><strong>关键区别</strong>：<code>--connect-timeout</code> 只管"把 TCP 连接建起来"这段时间；一旦连上了，即使服务器 10 分钟不返回数据，它也不会触发。而 <code>--max-time</code> 是<strong>总预算</strong>，从发起到结束全算上。</p>
+<p><strong>实践建议</strong>：生产脚本里两个都要给。<code>--connect-timeout 5 --max-time 30</code> 是个合理起点。</p>
+<h3 id="退出码速查表"><a href="#退出码速查表" class="headerlink" title="退出码速查表"></a>退出码速查表</h3>
+<p>curl 的退出码是脚本判断成败的依据，值得背下来：</p>
+<table><thead><tr><th>退出码</th><th>含义</th></tr></thead><tbody><tr><td>0</td><td>成功</td></tr><tr><td>1</td><td>通用错误（如 URL 格式错误）</td></tr><tr><td>3</td><td>URL 格式错误</td></tr><tr><td>6</td><td>无法解析主机</td></tr><tr><td>7</td><td>无法连接（端口不通）</td></tr><tr><td>22</td><td>HTTP 错误（配合 <code>-f</code>）</td></tr><tr><td>28</td><td>超时</td></tr><tr><td>35</td><td>TLS 握手失败</td></tr><tr><td>47</td><td>重定向次数超限</td></tr></tbody></table>
+<h3 id="trace-ascii-不装抓包工具也能看报文"><a href="#trace-ascii-不装抓包工具也能看报文" class="headerlink" title="`--trace-ascii`：不装抓包工具也能看报文"></a>`--trace-ascii`：不装抓包工具也能看报文</h3>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -s --trace-ascii trace.txt -o /dev/null http://127.0.0.1:8765/api/user</pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>* Uses proxy env variable no_proxy == '127.0.0.1,localhost'
+*   Trying 127.0.0.1:8765...
+* Established connection to 127.0.0.1 (127.0.0.1 port 8765)
+=&gt; Send header, 86 bytes (0x56)
+0000: GET /api/user HTTP/1.1
+0018: Host: 127.0.0.1:8765
+002e: User-Agent: curl/8.21.0
+0047: Accept: */*
+0054:
+* Request completely sent off
+&lt;= Recv header, 17 bytes (0x11)</pre></td></tr></table></figure>
+<p><code>=&gt;</code> 是发送，<code>&lt;=</code> 是接收，<code>0000:</code>/<code>0018:</code> 是十六进制偏移量。这比 <code>-v</code> 更底层 —— 能看到<strong>原始字节</strong>，包括 <code>-v</code> 会隐藏的细节。</p>
+<table><thead><tr><th>参数</th><th>效果</th></tr></thead><tbody><tr><td><code>--trace-ascii file</code></td><td>文本格式转储</td></tr><tr><td><code>--trace file</code></td><td>原始字节格式</td></tr><tr><td><code>--trace-time</code></td><td>每行加时间戳</td></tr><tr><td><code>--trace-ids</code></td><td>每行加连接 ID（并发时有用）</td></tr><tr><td><code>--trace-config</code></td><td>精细控制哪些内容要记录</td></tr></tbody></table>
+<blockquote><p><strong>注意</strong>：<code>--trace</code> / <code>--trace-ascii</code> 会把<strong>请求头和响应头全部写进文件</strong>，包括 Authorization 里的令牌。写到共享目录前务必脱敏。</p></blockquote>
+<hr>
+<h2 id="把-curl-用进日常工作的几条实战建议"><a href="#把-curl-用进日常工作的几条实战建议" class="headerlink" title="把 curl 用进日常工作的几条实战建议"></a>把 curl 用进日常工作的几条实战建议</h2>
+<p><strong>1. 养成 <code>-sS -o /dev/null -w</code> 的固定组合</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>curl -sS -o /dev/null -w '%{http_code} %{time_total}\n' "$URL"</pre></td></tr></table></figure>
+<p>这是检查任意 URL 是否可达的最短可靠写法，比 <code>ping</code> 有用得多（它测的是真实 HTTP 链路）。</p>
+<p><strong>2. 写监控脚本时用退出码而不是状态码判断</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre>#!/usr/bin/env bash
+set -euo pipefail
+
+URL="https://api.example.com/health"
+for i in {1..3}; do
+  if curl -fsS --max-time 10 "$URL" -o /dev/null; then
+    echo "OK"
+    exit 0
+  fi
+  sleep 5
+done
+echo "FAILED after 3 attempts"
+exit 1</pre></td></tr></table></figure>
+<p><strong>3. 调试时先 <code>-v</code>，定稿后换 <code>-s</code></strong></p>
+<p>调试阶段要信息，定稿阶段要干净。养成切换的习惯。</p>
+<p><strong>4. 敏感信息走环境变量或配置文件</strong></p>
+<p>永远不要把 token、密码写进命令行。</p>
+<p><strong>5. 用 <code>--fail-with-body</code> 兼顾两者</strong>（curl 7.76+）</p>
+<p>比 <code>-f</code> 更聪明：既返回非零退出码，<strong>又保留错误响应体</strong>。排查 4xx 场景时特别有用。</p>
+<hr>
+<h2 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h2>
+<p>8 个场景跑下来，curl 的能力边界基本清晰了：</p>
+<ul>
+<li><strong>看得清</strong> —— <code>-v</code> / <code>--trace-ascii</code> 把协议层摊开</li>
+<li><strong>拿得准</strong> —— <code>-w</code> 把指标变成可编程数据，<code>%{json}</code> 直接给结构化输出</li>
+<li><strong>改得动</strong> —— <code>-H</code> / <code>-d</code> / <code>-F</code> / <code>-b</code> 覆盖各种请求形态</li>
+<li><strong>传得稳</strong> —— <code>-C -</code> 断点续传、<code>--retry</code> 自动重试、<code>--compressed</code> 压缩协商</li>
+<li><strong>管得住</strong> —— <code>-f</code> 退出码、<code>--max-time</code> 超时预算，让它能安全地跑在脚本里</li>
+</ul>
+<p>curl 的命令行哲学值得学：<strong>每个参数只做一件事，但可以被自由组合</strong>。想清楚"我现在要解决什么问题"，然后挑对应的参数拼起来 —— 这就是用好 curl 的全部方法论。</p>
+<hr>
+<h3 id="附-本文所有截图对应的原始命令"><a href="#附-本文所有截图对应的原始命令" class="headerlink" title="附：本文所有截图对应的原始命令"></a>附：本文所有截图对应的原始命令</h3>
+<p>&lt;details&gt; &lt;summary&gt;展开查看（点击可复制）&lt;/summary&gt;</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre></pre></td><td class="code"><pre># 场景 1：全貌侦察
+curl -v -s -o /dev/null http://127.0.0.1:8765/api/user
+curl -s -o /dev/null -w '状态码=%{http_code}  总耗时=%{time_total}s  体积=%{size_download}B\n' http://127.0.0.1:8765/api/user
+curl -s -o /dev/null -w 'dns=%{time_namelookup}s  connect=%{time_connect}s  tls=%{time_appconnect}s  ttfb=%{time_starttransfer}s  total=%{time_total}s\n' http://127.0.0.1:8765/api/user
+
+# 场景 2：只取数据
+curl -s https://api.github.com/users/octocat -o octocat.json
+curl -s -o /dev/null -w 'GitHub API: %{http_code}  %{time_total}s\n' https://api.github.com/users/octocat
+curl -s -o /dev/null -w '%{json}' http://127.0.0.1:8765/api/user
+
+# 场景 3：定制请求
+curl -s -H 'X-Api-Version: 2026-10-26' -H 'X-Trace-Id: demo-0001' \
+     -A 'MyApp/2.1 (curl-course)' -e 'https://example.com/dashboard' \
+     -b 'session=demo-session-token-8f3a2c' http://127.0.0.1:8765/api/headers
+curl -s -H 'User-Agent:' -H 'Accept:' http://127.0.0.1:8765/api/headers
+
+# 场景 4：发送数据
+curl -s -X POST -H 'Content-Type: application/json' \
+     -d '{"name":"curl","year":1998,"feature":true}' http://127.0.0.1:8765/api/json
+curl -s -d 'user=octocat&amp;action=login&amp;token=abc123' http://127.0.0.1:8765/api/form
+curl -s -F 'file=@upload_demo.txt' -F 'kind=text' http://127.0.0.1:8765/api/upload
+
+# 场景 5：会话与重定向
+curl -s -c jar.txt http://127.0.0.1:8765/api/login
+curl -s -o /dev/null -w '状态码=%{http_code}\n' http://127.0.0.1:8765/api/dashboard
+curl -s -b jar.txt -w '\n状态码=%{http_code}\n' http://127.0.0.1:8765/api/dashboard
+curl -s -o /dev/null -D - http://127.0.0.1:8765/redirect/2 | head -4
+curl -s -L -o /dev/null -w '最终URL=%{url_effective}\n跳转次数=%{num_redirects}\n' http://127.0.0.1:8765/redirect/2
+
+# 场景 6：认证
+curl -s -u 'demo:s3cret' http://127.0.0.1:8765/api/basic
+curl -s -u 'demo:wrong' -w '\n状态码=%{http_code}\n' http://127.0.0.1:8765/api/basic
+curl -s -H 'Authorization: Bearer demo-session-token-8f3a2c' http://127.0.0.1:8765/api/secure
+curl -s -H 'Authorization: Bearer bad-token' http://127.0.0.1:8765/api/secure
+
+# 场景 7：文件传输
+curl -s http://127.0.0.1:8765/api/bigfile -o big.bin -w '下载完成 %{size_download} 字节\n'
+curl -s -r 0-102400 http://127.0.0.1:8765/api/bigfile -o part.bin -w '已下载 %{size_download} 字节\n'
+curl -s -C - http://127.0.0.1:8765/api/bigfile -o part.bin -w '本次续传 %{size_download} 字节，HTTP %{http_code}\n'
+curl -s --limit-rate 40k http://127.0.0.1:8765/api/slow?seconds=3 -o /dev/null -w '限速 → %{time_total}s\n'
+curl -s --compressed http://127.0.0.1:8765/api/gzip -o gz1.json -w '传输字节=%{size_download}\n'
+curl -s http://127.0.0.1:8765/api/gzip -o gz2.json -w '传输字节=%{size_download}\n'
+
+# 场景 8：线上排障
+curl -s -f http://127.0.0.1:8765/api/status/404 -w '状态码=%{http_code}\n'; echo "退出码=$?"
+curl -s --retry 2 --retry-delay 1 --retry-connrefused -o /dev/null -w '最终 %{http_code}\n' http://127.0.0.1:8765/api/status/500
+curl -s --max-time 2 http://127.0.0.1:8765/api/slow?seconds=6 -o /dev/null -w '状态码=%{http_code}\n'; echo "退出码=$?"
+curl -s --connect-timeout 3 http://127.0.0.1:9/nope -w '状态码=%{http_code}\n'; echo "退出码=$?"
+curl -s --trace-ascii trace.txt -o /dev/null http://127.0.0.1:8765/api/user</pre></td></tr></table></figure>
+<p>&lt;/details&gt;</p>
+<hr>
+<p><em>本文所有截图均由本地终端真实执行 curl 命令后截取，未做任何后期修饰。演示用的 mock API 服务源码与截图渲染脚本可一并复现。</em></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://waterwater-blue.github.io">waterwater-blue</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://waterwater-blue.github.io/2026/10/26/curl-practice-guide/">https://waterwater-blue.github.io/2026/10/26/curl-practice-guide/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://waterwater-blue.github.io" target="_blank">waterwater-blue</a>！</span></div></div><div class="tag_share"><a class="tag-cloud" href="/tags/curl/">curl</a><a class="tag-cloud" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="tag-cloud" href="/tags/%E7%BD%91%E7%BB%9C%E5%88%86%E6%9E%90/">网络分析</a><a class="tag-cloud" href="/tags/%E9%9A%8F%E7%AC%94/">随笔</a></div><div class="post-share"><div class="social-share" data-image="/img/butterfly-icon.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">对等保2.0的理解</div></div><div class="info-2"><div class="info-item-1">网络安全等级保护制度是我国网络安全领域的基本制度。通过学习《网络安全法》及等级保护2.0系列标准，我对其出台背景、标准体系、核心要求和实践意义形成了如下认识。 一、等保2.0的出台背景与法律依据等级保护制度在我国已有十余年实践。2007年《信息安全等级保护管理办法》（公通字〔2007〕43号）发布，标志着等级保护1.0正式启动，确立了定级备案、建设整改、等级测评和监督检查四项”规定动作”，并以《信息系统安全等级保护基本要求》（GB&#x2F;T 22239-2008）为核心形成标准体系。 随着云计算、移动互联、物联网、工业控制和大数据等新技术新应用快速发展，传统以狭义信息系统为对象的保护模式已难以覆盖新风险。2017年6月《中华人民共和国网络安全法》正式施行，其第二十一条明确规定”国家实行网络安全等级保护制度”，第三十一条进一步规定对关键信息基础设施在等级保护基础上实行重点保护。法律的实施为等级保护制度赋予了新的内涵，也推动标准体系从1.0升级为2.0。 等保2.0并非对1.0的否定，而是在继承”分级保护、分等级施策”核心思想基础上的全面升级：保护对象更广、技术与管理要求更全、主...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-09-28</div><div class="info-item-2">对等保2.0的理解</div></div><div class="info-2"><div class="info-item-1">网络安全等级保护制度是我国网络安全领域的基本制度。通过学习《网络安全法》及等级保护2.0系列标准，我对其出台背景、标准体系、核心要求和实践意义形成了如下认识。 一、等保2.0的出台背景与法律依据等级保护制度在我国已有十余年实践。2007年《信息安全等级保护管理办法》（公通字〔2007〕43号）发布，标志着等级保护1.0正式启动，确立了定级备案、建设整改、等级测评和监督检查四项”规定动作”，并以《信息系统安全等级保护基本要求》（GB&#x2F;T 22239-2008）为核心形成标准体系。 随着云计算、移动互联、物联网、工业控制和大数据等新技术新应用快速发展，传统以狭义信息系统为对象的保护模式已难以覆盖新风险。2017年6月《中华人民共和国网络安全法》正式施行，其第二十一条明确规定”国家实行网络安全等级保护制度”，第三十一条进一步规定对关键信息基础设施在等级保护基础上实行重点保护。法律的实施为等级保护制度赋予了新的内涵，也推动标准体系从1.0升级为2.0。 等保2.0并非对1.0的否定，而是在继承”分级保护、分等级施策”核心思想基础上的全面升级：保护对象更广、技术与管理要求更全、主...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">waterwater-blue</div><div class="author-info-description">waterwater-blue 的个人博客</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">3</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">5</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/waterwater-blue" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E5%AE%9E%E9%AA%8C%E7%8E%AF%E5%A2%83%E4%B8%8E%E6%96%B9%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一、实验环境与方法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E9%97%AE%E9%A2%98%E4%B8%80%EF%BC%9AUDP-%E8%BF%98%E6%98%AF-TCP%EF%BC%9F"><span class="toc-number">2.</span> <span class="toc-text">二、问题一：UDP 还是 TCP？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E9%97%AE%E9%A2%98%E4%BA%8C%EF%BC%9A%E5%8A%A0%E5%AF%86%E8%BF%98%E6%98%AF%E6%98%8E%E6%96%87%EF%BC%9F"><span class="toc-number">3.</span> <span class="toc-text">三、问题二：加密还是明文？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E9%97%AE%E9%A2%98%E4%B8%89%EF%BC%9A%E8%83%BD%E5%90%A6%E6%81%A2%E5%A4%8D%E5%87%BA%E6%98%8E%E6%96%87%E4%BC%A0%E8%BE%93%E7%9A%84%E6%96%87%E4%BB%B6%EF%BC%9F"><span class="toc-number">4.</span> <span class="toc-text">四、问题三：能否恢复出明文传输的文件？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E6%96%B9%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 方法原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E5%AE%9E%E9%99%85%E5%B0%9D%E8%AF%95%EF%BC%9A%E5%85%A8%E9%83%A8%E5%A4%B1%E8%B4%A5"><span class="toc-number">4.2.</span> <span class="toc-text">4.2 实际尝试：全部失败</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E4%B8%80%E6%AC%A1%E5%A4%B1%E8%B4%A5%E5%AE%9E%E9%AA%8C%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 一次失败实验的记录</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-%E6%98%8E%E6%96%87%E5%9C%BA%E6%99%AF%E7%9A%84%E9%AA%8C%E8%AF%81%E5%B0%9D%E8%AF%95"><span class="toc-number">4.4.</span> <span class="toc-text">4.4 明文场景的验证尝试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81PC-PC-%E7%AB%AF%E4%B8%8E-PC-%E6%89%8B%E6%9C%BA%E7%AB%AF%E5%AF%B9%E7%85%A7"><span class="toc-number">5.</span> <span class="toc-text">五、PC-PC 端与 PC-手机端对照</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E4%B8%89%E4%B8%AA%E9%97%AE%E9%A2%98%E7%9A%84%E7%AD%94%E6%A1%88%E6%B1%87%E6%80%BB"><span class="toc-number">6.</span> <span class="toc-text">六、三个问题的答案汇总</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E4%B8%80%E7%82%B9%E6%84%9F%E6%83%B3"><span class="toc-number">7.</span> <span class="toc-text">七、一点感想</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/18/qq-wireshark-analysis/" title="用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？">用 Wireshark 抓取自己的 QQ 流量：它到底走 TCP 还是 UDP？加密了吗？能还原出明文文件吗？</a><time datetime="2026-10-18T11:40:00.000Z" title="发表于 2026-10-18 19:40:00">2026-10-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/09/28/dengbao-2-notes/" title="对等保2.0的理解">对等保2.0的理解</a><time datetime="2026-09-28T12:30:00.000Z" title="发表于 2026-09-28 20:30:00">2026-09-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/09/28/hello-world/" title="你好，世界">你好，世界</a><time datetime="2026-09-28T06:30:00.000Z" title="发表于 2026-09-28 14:30:00">2026-09-28</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By waterwater-blue</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
